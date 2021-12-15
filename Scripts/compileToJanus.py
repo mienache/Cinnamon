@@ -5,8 +5,8 @@ import re
 import os.path
 #Janus code path
 #Set JanusPATH and parser PATH to the root directory of janus and cinnamon respectively 
-JanusPATH = "/your-path-to-janus/Janus"
-parserPATH="/your-path-to-cinnamon-compiler/cinnamon"
+JanusPATH = "/janus"
+parserPATH= "/cinnamon"
 def usage():
 	print "compileToJanus.py <program.dsl>"
 if len(sys.argv) != 2:
