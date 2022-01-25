@@ -7,6 +7,8 @@ extern int yylex(void);
 void yyerror(ProgramBlock*& program, const char *s) {printf("ERROR: %s\n", s);}
 %}
 
+%define parse.error verbose
+
 %locations
 %parse-param {ProgramBlock*& program}
 %union{

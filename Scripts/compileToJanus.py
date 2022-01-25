@@ -18,6 +18,8 @@ dslFile = sys.argv[1]
 fileName = os.path.splitext(dslFile)[0]
 
 os.system(parserPATH + '/bdc ' + dslFile)  
+#os.system("gdb --args " + parserPATH + '/bdc ' + dslFile)
+
 
 #Step 2: Call clang compiler to generate assembly code for actions
 os.system('clang++ -fno-stack-protector -fomit-frame-pointer -fno-asynchronous-unwind-tables -S '+ fileName + '.cpp -o ' + fileName + '.s')
@@ -42,7 +44,7 @@ with open(fileName+".stat", 'r') as static_file:
 		with open(JanusPATH+"/static/schedgen/dsl/StaticGenCode.cpp", "w") as replace_file:
 			replace_file.write(content_new)
 			print "static rule generation code:"
-			print content_new
+			# print content_new
 
 with open(fileName+".stath", 'r') as static_h_file:
 	code = static_h_file.read();
@@ -53,7 +55,7 @@ with open(fileName+".stath", 'r') as static_h_file:
 		with open(JanusPATH+"/static/schedgen/dsl/StaticGenCode.cpp", "w") as replace_file:
 			replace_file.write(content_new)
 			print "global var decl - static part"
-			print content_new
+			# print content_new
 
 with open(fileName+".dyn", 'r') as dynamic_file:
 	code = dynamic_file.read();
@@ -64,7 +66,7 @@ with open(fileName+".dyn", 'r') as dynamic_file:
 		with open(JanusPATH+"/dynamic/dsl/dsl_handler.cpp", "w") as replace_file:
 			replace_file.write(content_new)
 			print "dynamic handler code:"
-			print content_new
+			# print content_new
 with open(fileName+".dynh", 'r') as dynamic_h_file:
 	code = dynamic_h_file.read();
 	code = '/*--- Global Var Decl Start ---*/\n'+code+'\n/*--- Global Var Decl End ---*/'
@@ -74,7 +76,7 @@ with open(fileName+".dynh", 'r') as dynamic_h_file:
 		with open(JanusPATH+"/dynamic/dsl/func.cpp", "w") as replace_file:
 			replace_file.write(content_new)
 			print "global declarations - dyn part"
-			print content_new
+			# print content_new
 
 with open(fileName+".func", 'r') as func_file:
 	code = func_file.read();
@@ -85,7 +87,7 @@ with open(fileName+".func", 'r') as func_file:
 		with open(JanusPATH+"/dynamic/dsl/func.cpp", "w") as replace_file:
 			replace_file.write(content_new)
 			print "function code:"
-			print content_new
+			# print content_new
 
 with open(fileName+".funch", 'r') as header_file:
 	code = header_file.read();
@@ -96,7 +98,7 @@ with open(fileName+".funch", 'r') as header_file:
 		with open(JanusPATH+"/dynamic/dsl/func.h", "w") as replace_file:
 			replace_file.write(content_new)
 			print "function header code:"
-			print content_new
+			# print content_new
 with open(fileName+".exit", 'r') as exit_file:
 	code = exit_file.read();
 	code = '/*--- Termination Start ---*/\n'+code+'\n/*--- Termination End ---*/'
@@ -106,7 +108,7 @@ with open(fileName+".exit", 'r') as exit_file:
 		with open(JanusPATH+"/dynamic/dsl/func.cpp", "w") as replace_file:
 			replace_file.write(content_new)
 			print "thread exit code:"
-			print content_new
+			# print content_new
 with open(fileName+".init", 'r') as init_file:
 	code = init_file.read();
 	code = '/*--- Init Start ---*/\n'+code+'\n/*--- Init End ---*/'
@@ -116,4 +118,4 @@ with open(fileName+".init", 'r') as init_file:
 		with open(JanusPATH+"/dynamic/dsl/func.cpp", "w") as replace_file:
 			replace_file.write(content_new)
 			print "thread entry code:"
-			print content_new
+			# print content_new

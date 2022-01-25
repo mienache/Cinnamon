@@ -498,7 +498,13 @@ dr_restore_reg(drcontext,bb,trigger,DR_REG_RSP,SPILL_SLOT_17);)";
     /* Insert call instruction */
     if(regex_match(opcode, regex("call[a-z]"))){
         if(op[0] == OP_FUNC){
-            output += "XINST_CREATE_call(drcontext, " + opnd1 + "));";
+            if(regex_match(opnd1, regex("[a-zA-Z_0-9]*create_checker_thread[a-zA-Z_0-9]*"))) {
+                // TODO: discuss with Tim the best way to implement clean calls
+                return "dr_insert_clean_call(drcontext, bb, instrlist_first(bb), create_checker_thread, false, 0);";
+            }
+            else {
+                output += "XINST_CREATE_call(drcontext, " + opnd1 + "));";
+            }
         } else {
             output = "None";
         }
@@ -658,6 +664,8 @@ dr_restore_reg(drcontext,bb,trigger,DR_REG_RSP,SPILL_SLOT_17);)";
 
 /* save and restore some registers */
 void use_reg(string reg){
+    const string original_reg(reg);
+
     if(reg[7] == 'E'){
         reg[7] = 'R';
     }
@@ -670,7 +678,14 @@ void use_reg(string reg){
                 return;
         }
     }
+
+    if (reg == "DR_REG_RAL") {
+        // TODO: investigate later why renaming this register fails
+        reg = original_reg;
+    }
+
     used_reg.push_back(reg);
+
 }
 
 /* save and restore all caller saving registers */

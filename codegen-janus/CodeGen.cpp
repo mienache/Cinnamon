@@ -106,6 +106,11 @@ void print_str(char* x){
     printf("%s\n",x);
 })";
 
+string extern_func =
+R"(
+extern void create_checker_thread();
+)";
+
 
 template<class Type1, class Type2>
 bool isInstanceOf(Type1* Instance) {
@@ -1431,6 +1436,10 @@ void CodeGen::visit(ProgramBlock* prog) {
     
     *(outfile[curr])<< print_func << endl;
     
+    *(outfile[curr])<< "// External functions" << endl;
+    *(outfile[curr])<< extern_func << endl;
+    // TODO: discuss about this with Tim
+
     global= false;
     is_act = true;
     prog->globaldeclarations->accept(*this); 
