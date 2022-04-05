@@ -165,4 +165,16 @@ void Component::accept(Visitor& v){
     v.visit(this);
 }
 
+void ComplexType::accept(Visitor& v) {
+    v.visit(this);
+}
+
+void ComplexTypeDecl::accept(Visitor& v) {
+    v.visit(this);
+}
+
+void ThreadType::accept(Visitor& v) {
+    v.visit(this);
+}
+
 

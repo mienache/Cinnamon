@@ -29,6 +29,7 @@ void yyerror(ProgramBlock*& program, const char *s) {printf("ERROR: %s\n", s);}
     LHS*                lhs;
     CompositeType*      comptype;
     PrimitiveType*       primtype;
+    ComplexType*        complextype;
 
     ExpressionList*     exprlist;
     StatementList*      stmtlist;
@@ -53,6 +54,7 @@ void yyerror(ProgramBlock*& program, const char *s) {printf("ERROR: %s\n", s);}
 %token <token> TUPLE DICT VECT SET PAIR INT VAR CHAR DOUBLE BOOL UINT32 UINT64 ADDR_INT FILE_IO FILE_LINE INSTR
 %token <token> FUNC INST LOOP BASICBLOCK SSANODE MODULE
 %token <token> OP_CALL OP_MOV OP_ADD OP_SUB OP_MUL OP_DIV OP_NOP OP_RETURN OP_BRANCH OP_CMP OP_LOAD OP_STORE OP_GETPTR OP_INC OP_LABEL OP_JNL OP_JL
+%token <token> THREAD
 %left PLUS MINUS
 %left MULT DIV
 
@@ -84,10 +86,11 @@ void yyerror(ProgramBlock*& program, const char *s) {printf("ERROR: %s\n", s);}
 %type <token> bool_const
 %type <token> opcode register reg_id_type reg_type
 
-%type <typedecl> type_decl_expr primitive_type_decl composite_type_decl file_type_decl instr_type_decl bb_type_decl
+%type <typedecl> type_decl_expr primitive_type_decl composite_type_decl complex_type_decl file_type_decl instr_type_decl bb_type_decl
 %type <typespec> v_type
 %type <primtype> primitive_type
 %type <comptype> composite_type tuple array dict pair set vect
+%type <complextype> complex_type thread
 %type <exprlist> composite_init
 %type <typespeclist> type_list
 %start prog
@@ -121,7 +124,7 @@ type_decl_stmt:
         type_decl_expr SEMICOLON {$$= new TypeDeclStmt($1);}
 ;
 
-type_decl_expr: primitive_type_decl {$$=$1;} | composite_type_decl {$$=$1;} | file_type_decl {$$=$1;} | instr_type_decl {$$=$1;} | bb_type_decl {$$=$1;}
+type_decl_expr: primitive_type_decl {$$=$1;} | composite_type_decl {$$=$1;} | complex_type_decl {$$=$1;} | file_type_decl {$$=$1;} | instr_type_decl {$$=$1;} | bb_type_decl {$$=$1;}
 ;
 
 primitive_type_decl: primitive_type ident {$$ = new PrimitiveTypeDecl($1, $2);} | primitive_type ident INIT_OP expr {$$= new PrimitiveTypeDecl($1, $2, $4);}
@@ -144,6 +147,15 @@ composite_type_decl:
 ;
 composite_type:
         tuple {$$=$1;}| array {$$=$1;} | dict{ $$=$1;} | pair {$$=$1;} | vect {$$=$1;} | set {$$=$1;}
+;
+complex_type_decl:
+        complex_type ident {$$ = new ComplexTypeDecl($1, $2); }
+;
+complex_type:
+        thread {$$=$1;}
+;
+thread:
+        THREAD {$$ = new ThreadType();}
 ;
 tuple:
         TUPLE LT type_list GT {$$= new TupleType($3);}

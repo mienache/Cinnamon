@@ -72,6 +72,19 @@ map<string, uint32_t> regName = {{"DR_REG_NULL", 0},
     {"DR_REG_R12W", 45},    {"DR_REG_R13W", 46},    {"DR_REG_R14W", 47},    {"DR_REG_R15W", 48},
 };
 
+vector<string> app_functions = {"run_thread"};
+
+string get_app_function_name(const string func_name)
+{
+    for (auto app_func : app_functions) {
+        const string pattern = "[a-zA-Z_0-9]*" + app_func + "[a-zA-Z_0-9]*";
+        if(regex_match(func_name, regex(pattern))) {
+            return app_func;
+        }
+    }
+    return "";
+}
+
 int main(int argc, char** argv){
     if(argc < 2){
         cout << "Expecting assembly filename as input" << endl;
@@ -498,6 +511,10 @@ dr_restore_reg(drcontext,bb,trigger,DR_REG_RSP,SPILL_SLOT_17);)";
     /* Insert call instruction */
     if(regex_match(opcode, regex("call[a-z]"))){
         if(op[0] == OP_FUNC){
+            const string app_func_name = get_app_function_name(opnd1);
+            if(app_func_name.size()) {
+                return "insert_function_call_as_application(janus_context, " + app_func_name + ")";
+            }
             if(regex_match(opnd1, regex("[a-zA-Z_0-9]*create_checker_thread[a-zA-Z_0-9]*"))) {
                 // TODO: discuss with Tim the best way to implement clean calls
                 return "dr_insert_clean_call(drcontext, bb, instrlist_first(bb), create_checker_thread, false, 0);";

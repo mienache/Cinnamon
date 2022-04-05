@@ -24,7 +24,8 @@ enum{
     STAT_H,
     DYN_H,
     ACT_C,
-    AT_C
+    AT_C,
+    THREAD_INIT_C,
 };
 typedef struct{
   int type;
@@ -66,7 +67,8 @@ class CodeGen : public Visitor {
     fstream outfile_dh;
     fstream outfile_ac;
     fstream outfile_at;
-    fstream *outfile[12];
+    fstream outfile_thread_init;
+    fstream *outfile[13];
     int curr;
    public:
         
@@ -75,6 +77,7 @@ class CodeGen : public Visitor {
     
     void indent();
     void create_handler_table();
+    void create_thread_init();
 
     void visit(StatementList* stmtlst);
 
@@ -153,10 +156,16 @@ class CodeGen : public Visitor {
     void visit(VectType* vect);
 
     void visit(SetType* set_);
+    
+    void visit(ThreadType* thread);
 
     void visit(PrimitiveTypeDecl* ptypedecl);
     
     void visit(CompositeTypeDecl* ctypedecl);
+
+    void visit(ComplexTypeDecl* ctypedecl);
+    
+    void visit(ComplexType* ctype);
     
     void visit(FileTypeDecl* ftypedecl);
 

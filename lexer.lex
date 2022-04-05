@@ -75,6 +75,7 @@ comment     "//".*"\n"
 "dict"                  {return DICT;}
 "vector"                {return VECT;}
 "set"                   {return SET;}
+"thread"                {return THREAD;}
 "inst"                  {return INST;}
 "instr"                 {return INSTR;}
 "ssanode"               {return SSANODE;}

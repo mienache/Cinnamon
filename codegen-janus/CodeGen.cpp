@@ -6,6 +6,7 @@
 #include <deque>
 #include <stack>
 #include <algorithm>
+#include <cassert>
 #include "CodeGen.h"
 #include "util.h"
 #define MAX_NEST 10
@@ -106,10 +107,21 @@ void print_str(char* x){
     printf("%s\n",x);
 })";
 
-string extern_func =
+string thread_extern_func =
 R"(
-extern void create_checker_thread();
+extern void run_thread(AppThread *t);
+extern void register_thread(AppThread *t, char *thread_role);
 )";
+
+
+int num_threads = 0; // Number of threads to be created in Janus
+
+// This keeps the order in which threads will be registered in Janus.
+// The order is given by the order in which `thread` variables are defined in the dsl file.
+ vector <string> thread_registration_order;
+ map <string, string> thread_name_to_role;
+
+void process_register_thread_call(FunctionCall *fc);
 
 
 template<class Type1, class Type2>
@@ -146,6 +158,7 @@ CodeGen::CodeGen(std::string filename){
     outfile_dh.open(filename+".dynh", ios::out);        //Global Var Definitions for Dynamic Part
     outfile_ac.open(filename+".cpp", ios::out);         //Code to be compiled into assembly
     outfile_at.open(filename+".at", ios::out);         //Code to be compiled into assembly
+    outfile_thread_init.open(filename+".thread_init", ios::out);         //Code to be compiled into assembly
     global_file = filename+".globalh" ;         
     outfile[STAT] = &outfile_s;
     outfile[DYN] = &outfile_d;
@@ -159,6 +172,7 @@ CodeGen::CodeGen(std::string filename){
     outfile[DYN_H] = &outfile_dh;
     outfile[ACT_C] = &outfile_ac;
     outfile[AT_C] = &outfile_at;
+    outfile[THREAD_INIT_C] = &outfile_thread_init;
     curr= STAT;
     get_func[STATIC]= get_static_func;                  //Utility functions for CFE attributes available in Static part
     get_func[DYNAMIC]= get_dyn_func;                    //Utility function for CFE attributes available in Dynamic part
@@ -189,8 +203,41 @@ void CodeGen::create_handler_table(){
     *(outfile[DYN])<<"}"<<endl;
     indentLevel[DYN]=0;
 }
-void CodeGen::visit(StatementList* stmtlst){
+
+void CodeGen::create_thread_init()
+{
+    assert(curr == THREAD_INIT_C);
+
+    *(outfile[curr]) << std::endl;
+
+    ++indentLevel[curr];
+    bool is_first = true;
+    for (auto thread_name : thread_registration_order) {
+        const string thread_role = thread_name_to_role[thread_name];
+
+        indent();
+        if (!is_first) {
+            *(outfile[curr]) << "else ";
+        }
+        *(outfile[curr]) << "if(!" << thread_name << ") {" << std::endl;
+
+        ++indentLevel[curr];
+        indent();
+        *(outfile[curr]) << thread_name << " = register_thread(" << thread_role << ", drcontext);" << std::endl;
+        --indentLevel[curr];
+
+        indent();
+        *(outfile[curr]) << "}" << std::endl;
+
     
+        is_first = false;
+    }
+    --indentLevel[curr];
+}
+
+
+void CodeGen::visit(StatementList* stmtlst){
+    std::cout << "Visiting StatementList" << std::endl;
     if(stmtlst->statements.size() != 0)
     {
         for(auto stmt: stmtlst->statements){
@@ -199,6 +246,7 @@ void CodeGen::visit(StatementList* stmtlst){
     }
 }
 void CodeGen::visit(SelectStatementList* stmtlst){
+    std::cout << "Visiting SelectStatementList" << std::endl;
     if(stmtlst->stmts.size() != 0)
     {
         for(auto stmt: stmtlst->stmts){
@@ -214,6 +262,7 @@ void CodeGen::visit(NodeList* nl) {
 }
 
 void CodeGen::visit(ExpressionList* el) {
+    std::cout << "Visit ExpressionList" << std::endl;
     int size,count=0;
     size = el->expressions.size();
     for(auto exp: el->expressions){
@@ -224,8 +273,10 @@ void CodeGen::visit(ExpressionList* el) {
     }        
 }
 void CodeGen::visit(Identifier* id) {
+    std::cout << "Visit Identifier " << std::endl;
    string vid = id->name;
    if(within_action){//access in dynamic part
+        std::cout << "Within action " << std::endl;
        if(is_action_var(vid) || is_global_var(vid)){
            if(is_global_var(vid)){
                global_uses[vid].second.ref = 1;
@@ -252,6 +303,7 @@ void CodeGen::visit(Identifier* id) {
        }
    }
    else{//access in static part
+        std::cout << "NOT Within action " << std::endl;
       if(is_active_var(vid)){
            *(outfile[curr])<<vid;
            if(is_global_var(vid)){
@@ -293,6 +345,7 @@ void CodeGen::visit(BoolConst* bc) {
 
 }
 void CodeGen::visit(OpCode* op) {
+    std::cout << "Visiting OpCode" << std::endl;
     string str;
     if(rhs_opcode)
         str = instr_opcodes[op->value];
@@ -305,6 +358,7 @@ void CodeGen::visit(NullPtr* ptr) {
     *(outfile[curr]) << "NULL"; 
 }
 void CodeGen::visit(ConstraintExpr* condexpr) {
+    std::cout << "Visiting ConstraintExpr" << std::endl;
        if(condexpr != NULL)
            condexpr->accept(*this);
 }
@@ -345,6 +399,7 @@ void CodeGen::visit(RegValExpr* regvalexpr){
         //TODO
 }
 void CodeGen::visit(IdentLHS* ilhs) {
+    std::cout << "Visiting IdentLHS" << std::endl;
    string ident = ilhs->name->name;
    if(fcall){                   //NB:A hack to avoid warnings or errors that function name not found as Cinnamon does not support function definitions a.t.m.
        *(outfile[curr])<<ident;
@@ -476,6 +531,7 @@ void CodeGen::visit(IndexLHS* ixlhs){
 }
 
 void CodeGen::visit(DerefLHS* dlhs) {
+    std::cout << "Visiting DerefLHS" << std::endl;
     if( isInstanceOf<LHS, IdentLHS>(dlhs->base)){ //if we have I.trgaddr or x.y
         std::string base_name= ((IdentLHS*)dlhs->base)->name->name;
         std::string field_name = dlhs->field->name;
@@ -645,7 +701,15 @@ void CodeGen::visit(DerefLHS* dlhs) {
     } 
 }
 
+void handle_thread_specific_function_call(FunctionCall *fc);
 void CodeGen::visit(FunctionCall* fc) {
+    std::cout << "Visit FunctionCall" << std::endl;
+
+    if (((IdentLHS*) fc->name)->name->name == "register_thread") {
+        process_register_thread_call(fc);
+        return;
+    }
+
     fcall = true;
     fc->name->accept(*this);
     fcall = false;
@@ -662,7 +726,9 @@ void CodeGen::visit(FunctionCall* fc) {
         no_var_func = false;
 }
 
+
 void CodeGen::visit(AssnExpression* aexpr) {
+    std::cout << "Visiting AssnExpression" << std::endl;
      lhs_assn = true;
      aexpr->lhs->accept(*this);
      lhs_assn= false;
@@ -678,6 +744,7 @@ void CodeGen::visit(AssnExpression* aexpr) {
 }
 
 void CodeGen::visit(UnaryExpression* uexpr) {
+    std::cout << "Visiting UnaryExpression" << std::endl;
     std::string op, expr;
     switch(uexpr->op){
       case NOT:
@@ -820,8 +887,20 @@ void CodeGen::visit(TypePredExpr* typeexpr) {
 }
 
 void CodeGen::visit(ExprStatement* estmt) {
+    std::cout << "Visiting ExprStatement" << std::endl;
     indent(); estmt->expr->accept(*this);
-    *(outfile[curr])<<SEMICOLON<<endl;
+
+    bool print_semicolon = 1;
+    if (isInstanceOf<Expression, FunctionCall>(estmt->expr)) {
+        FunctionCall *fc = (FunctionCall*) estmt->expr;
+        if (((IdentLHS*) fc->name)->name->name == "register_thread") {
+            print_semicolon = 0;
+        }
+    }
+
+    if (print_semicolon) {
+        *(outfile[curr])<<SEMICOLON<<endl;
+    }
 
 }
 void CodeGen::visit(ifStmt* ifstmt) {
@@ -1087,7 +1166,6 @@ void CodeGen::visit(BasicblockTypeDecl* bbtypedecl) {
 
 /*----- Primitive Type Declarations (int, char, double etc) ------*/
 void CodeGen::visit(PrimitiveTypeDecl* ptypedecl) {
-
    std::string type, identifier, init;
    //if global variable, extern type identifier in func.h and then init in func.cpp
   
@@ -1159,6 +1237,7 @@ void CodeGen::visit(CompositeTypeDecl* ctypedecl) {
 }
 /*---- Process Commands of Cinnamon Program  ---- */
 void CodeGen::visit(CommandBlock* cmdblock) {
+    std::cout << "Visiting CommandBlock" << std::endl;
      curr = STAT;
      cmdlevel++;
 
@@ -1174,6 +1253,7 @@ void CodeGen::visit(CommandBlock* cmdblock) {
     
      //generate any constraints attached to a command
      if(((ConstraintExpr* )cmdblock->cond)->cond != NULL){
+         std::cout << "Generating code for ConstraintExpr" << std::endl;
          indent(); *(outfile[curr])<<"if( ";
          ((ConstraintExpr*)cmdblock->cond)->cond->accept(*this);
          *(outfile[curr])<<"){"<<endl;
@@ -1435,10 +1515,15 @@ void CodeGen::visit(ProgramBlock* prog) {
     *(outfile[curr])<<"using namespace std;"<<endl;
     
     *(outfile[curr])<< print_func << endl;
+
+    if (num_threads) {
+        *(outfile[curr])<< endl << "// Thread type declaration" << endl;
+        *(outfile[curr])<< "extern struct AppThread;" << endl << endl;
+
+        *(outfile[curr])<< "// External functions" << endl;
+        *(outfile[curr])<< thread_extern_func << endl;
+    }
     
-    *(outfile[curr])<< "// External functions" << endl;
-    *(outfile[curr])<< extern_func << endl;
-    // TODO: discuss about this with Tim
 
     global= false;
     is_act = true;
@@ -1446,14 +1531,18 @@ void CodeGen::visit(ProgramBlock* prog) {
     is_act = false;
     curr = GLOBAL_H;
     // }
-    
+
     generateMapFunctions();
     generateSetFunctions();
     generateVectorFunctions();
 
+    std::cout << "Before step 2 " << std::endl;
+
     //Step 2: Start generating code for command blocks
     if(prog->commandblocks->nodes.size())
         prog->commandblocks->accept(*this);
+
+    std::cout << "Before step 3 " << std::endl;
    
     //Step 3: start generartting code for exit blocks
     if(prog->exit_stmts->statements.size()){
@@ -1464,6 +1553,9 @@ void CodeGen::visit(ProgramBlock* prog) {
         exit_block = false;
         indentLevel[curr]--;
     }
+
+    std::cout << "Before step 4 " << std::endl;
+
     //Step 4: start generartting code for init blocks
     if(prog->init_stmts->statements.size()){
         curr= INIT_C;
@@ -1472,6 +1564,15 @@ void CodeGen::visit(ProgramBlock* prog) {
         prog->init_stmts->accept(*this);
         init_block = false;
         indentLevel[curr]--;
+    }
+
+    if (num_threads) {
+        curr = INIT_C;
+
+        ++indentLevel[curr];
+        indent();
+        *(outfile[curr]) << "initThreads(" << num_threads << ");" << std::endl;
+        --indentLevel[curr];
     }
 
     //Step 5: All global declrations were combined in .globalh file. split them in .stath and .dynh file based on where they are accessed
@@ -1535,6 +1636,10 @@ void CodeGen::visit(ProgramBlock* prog) {
     //Step 8: create dynamic handler table
     curr = DYN;
     create_handler_table();
+
+    // Step 9: create file for per thread initialisation
+    curr = THREAD_INIT_C;
+    create_thread_init();
 }
 
 
@@ -1757,4 +1862,65 @@ void CodeGen::generateVectorFunctions(){
             *(outfile[ACT_C]) << "}" << endl;
         }
     }
+}
+
+void CodeGen::visit(ComplexType* complexType) {
+    std::cout << "In visit ComplexType" << std::endl;
+}
+
+void CodeGen::visit(ComplexTypeDecl* complexTypeDecl) {
+    std::cout << "Visiting ComplexTypeDecl" << std::endl;
+    std::string identifier = complexTypeDecl->ident->name;
+    if(global){
+        std::cout << "Adding identifier to global decls" << std::endl;
+        globalDeclList[identifier] = declLineNo++;
+        globalVars.insert(identifier);
+        activeVars.push_back(identifier);
+    }
+    else {
+        std::cout << "NOT Adding identifier to global decls" << std::endl;
+    }
+
+    complexTypeDecl->type->accept(*this);
+    complexTypeDecl->ident->accept(*this);
+    (*outfile[curr]) << ";" << endl;
+
+    if (global && isInstanceOf<ComplexType, ThreadType>(complexTypeDecl->type)) {
+        thread_registration_order.emplace_back(complexTypeDecl->ident->name);
+    }
+}
+
+void CodeGen::visit(ThreadType* threadType) {
+    (*outfile[curr]) << "AppThread *";
+    if (global) {
+        // Currently support only global thread objects
+        ++num_threads;
+    }
+}
+
+void process_register_thread_call(FunctionCall *fc) {
+    if (fc->arguments->expressions.size() != 2) {
+        cerr<< "ERROR: invalid number of arguments for register_thread" << endl;
+        error_count++;
+        return;
+    }
+
+    if (!isInstanceOf<Expression, Identifier>(fc->arguments->expressions[0])) {
+        cerr<< "ERROR: invalid argument 1 of register_thread" << endl;
+        error_count++;
+        return;
+    }
+
+    if (!isInstanceOf<Expression, StrConst>(fc->arguments->expressions[1])) {
+        cerr<< "ERROR: invalid argument 2 of register_thread" << endl;
+        error_count++;
+        return;
+    }
+
+    const string thread_name = ((Identifier*) fc->arguments->expressions[0])->name;
+    const string role = ((StrConst*) fc->arguments->expressions[1])->value;
+
+    thread_name_to_role[thread_name] = role;
+
+    return;
 }

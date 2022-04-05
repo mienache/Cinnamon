@@ -24,6 +24,9 @@ class PrimitiveType;
 class CompositeType;
 class VType;
 class PrimtiveTypeDecl;
+class ComplexType;
+class ComplexTypeDecl;
+class ThreadType;
 
 typedef std::vector<Statement*>         stmtList;
 typedef std::vector<SelectionStmt*> selectStmtList;
@@ -414,6 +417,14 @@ class PrimitiveTypeDecl: public TypeDecl{
         PrimitiveTypeDecl(PrimitiveType* type, Identifier* name, Expression* init): type(type), name(name), init(init){}
         void accept(Visitor& v);
 };
+class ComplexType: public VType{
+        public:
+        void accept(Visitor& v);
+};
+class ThreadType: public ComplexType {
+        public:
+        void accept(Visitor& v);
+};
 class FileTypeDecl: public TypeDecl{
    public: 
         Identifier* ident;
@@ -447,6 +458,19 @@ class CompositeTypeDecl: public TypeDecl{
          init_list = new ExpressionList();
         }
         CompositeTypeDecl(CompositeType* type, Identifier* name, ExpressionList* init_list): type(type), name(name), init_list(init_list){}
+        void accept(Visitor& v);
+
+};
+class ComplexTypeDecl: public TypeDecl{
+    public:
+        ComplexType *type;
+        Identifier  *ident;
+        //ExpressionList*  init_list;
+        ComplexTypeDecl(ComplexType* type, Identifier* ident): type(type), ident(ident){
+         /*init undefined*/
+         // init_list = new ExpressionList();
+        }
+        // ComplexTypeDecl(CompositeType* type, Identifier* name, ExpressionList* init_list): type(type), name(name), init_list(init_list){}
         void accept(Visitor& v);
 
 };

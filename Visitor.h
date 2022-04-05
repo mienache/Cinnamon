@@ -57,6 +57,9 @@ public:
         virtual void visit(Action* action) =0;
         virtual void visit(ProgramBlock* prog) =0;
         virtual void visit(Component* comp) =0;
+        virtual void visit(ComplexType* ctype) =0;
+        virtual void visit(ComplexTypeDecl* ctypedecl) =0;
+        virtual void visit(ThreadType* thread) =0;
 
 };
 #endif

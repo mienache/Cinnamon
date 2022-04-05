@@ -119,3 +119,13 @@ with open(fileName+".init", 'r') as init_file:
 			replace_file.write(content_new)
 			print "thread entry code:"
 			# print content_new
+with open(fileName+".thread_init", 'r') as thread_init_file:
+	code = thread_init_file.read();
+	code = '/*--- Janus Thread Init Start ---*/\n'+code+'\n/*--- Janus Thread Init Finish ---*/'
+	with open(JanusPATH+"/dynamic/dsl/dsl_core.cpp", "r") as dest_file:
+		content = dest_file.read();
+		content_new = re.sub(r'/\*--- Janus Thread Init Start ---\*/.*?/\*--- Janus Thread Init Finish ---\*/', code, content, flags=re.DOTALL)
+		with open(JanusPATH+"/dynamic/dsl/dsl_core.cpp", "w") as replace_file:
+			replace_file.write(content_new)
+			print "Janus thread init code:"
+			# print content_new
