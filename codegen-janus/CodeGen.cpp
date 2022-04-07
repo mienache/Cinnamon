@@ -127,6 +127,10 @@ const int NO_FILE = -1;
 
 void process_register_thread_call(FunctionCall *fc);
 
+void process_enable_thread_specific(FunctionCall *fc, fstream *outfile);
+
+int curr_rule; // Index of the current rule (at entry, before, after etc. granularity)
+
 
 template<class Type1, class Type2>
 bool isInstanceOf(Type1* Instance) {
@@ -163,8 +167,9 @@ CodeGen::CodeGen(std::string filename){
     outfile_ac.open(filename+".cpp", ios::out);         //Code to be compiled into assembly
     outfile_at.open(filename+".at", ios::out);         //Code to be compiled into assembly
     outfile_thread_init.open(filename+".thread_init", ios::out);  //Code for Janus thread initialisation
-    outfile_thread_manager_cpp.open(filename+".thread_manager_cpp", ios::out); //Code for the Janus thread manager cpp
-    outfile_thread_manager_h.open(filename+".thread_manager_h", ios::out); //Code for the Janus thread manager header
+    outfile_thread_manager_cpp.open(filename+".thread_manager_cpp", ios::out); // Code for the Janus thread manager cpp
+    outfile_thread_manager_h.open(filename+".thread_manager_h", ios::out); // Code for the Janus thread manager header
+    outfile_thread_specific_handlers.open(filename+".thread_specific_handlers", ios::out); // Store which handlers should be thread specific
     global_file = filename+".globalh" ;         
     outfile[STAT] = &outfile_s;
     outfile[DYN] = &outfile_d;
@@ -181,6 +186,7 @@ CodeGen::CodeGen(std::string filename){
     outfile[THREAD_INIT_C] = &outfile_thread_init;
     outfile[THREAD_MANAGER_CPP] = &outfile_thread_manager_cpp;
     outfile[THREAD_MANAGER_H] = &outfile_thread_manager_h;
+    outfile[THREAD_SPECIFIC_HANDLERS] = &outfile_thread_specific_handlers;
     curr= STAT;
     curr_thread_file = NO_FILE;
     get_func[STATIC]= get_static_func;                  //Utility functions for CFE attributes available in Static part
@@ -722,6 +728,10 @@ void CodeGen::visit(FunctionCall* fc) {
 
     if (((IdentLHS*) fc->name)->name->name == "register_thread") {
         process_register_thread_call(fc);
+        return;
+    }
+    if (((IdentLHS*) fc->name)->name->name == "enable_thread_specific") {
+        process_enable_thread_specific(fc, outfile[THREAD_SPECIFIC_HANDLERS]);
         return;
     }
 
@@ -1317,6 +1327,8 @@ void CodeGen::visit(CommandBlock* cmdblock) {
 
 /*---- Process actions and generate corresponding code ----*/
 void CodeGen::visit(Action* action) {
+    ++curr_rule;
+
     //Code generated in two parts. Part 1 generates rules in static part of Janus to apply instrumentation.Part 2 encloses action code within callback functions
 
     /*------------ Step  1. Check if the action is associated with current CFE component type  ------------*/
@@ -1960,10 +1972,33 @@ void process_register_thread_call(FunctionCall *fc) {
         return;
     }
 
+    // TODO: check identifier has been declared before
     const string thread_name = ((Identifier*) fc->arguments->expressions[0])->name;
     const string role = ((StrConst*) fc->arguments->expressions[1])->value;
 
     thread_name_to_role[thread_name] = role;
+}
 
-    return;
+void process_enable_thread_specific(FunctionCall *fc, fstream *outfile)
+{
+    if (fc->arguments->expressions.size() != 1) {
+        // Currently support just specialization for only one thread, but it's easy to extend.
+        cerr<< "ERROR: invalid number of arguments for enable_thread_specific" << endl;
+        error_count++;
+        return;
+    }
+
+    if (!isInstanceOf<Expression, Identifier>(fc->arguments->expressions[0])) {
+        cerr<< "ERROR: invalid argument 1 of register_thread" << endl;
+        error_count++;
+        return;
+    }
+
+    // TODO: check identifier has been declared before
+
+    const string thread_name = ((Identifier*) fc->arguments->expressions[0])->name;
+
+    (*outfile) << curr_rule << " " << thread_name << endl;
+
+    std::cout << "Writing to file for rule " << curr_rule << " " << thread_name << endl;
 }

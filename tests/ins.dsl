@@ -10,10 +10,15 @@ select inst I where ((I.opcode) == Load) {
    before I {
        inst_count = inst_count + 1;
    }
+   after I {
+      inst_count = inst_count + 1;
+   }
 }
 
 select func F where (F.isMain) {
    entry F {
+      enable_thread_specific(main_thread);
+
       register_thread(checker_thread, "worker");
       run_thread(checker_thread);
    }

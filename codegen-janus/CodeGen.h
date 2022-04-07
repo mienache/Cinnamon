@@ -28,6 +28,7 @@ enum{
     THREAD_INIT_C,
     THREAD_MANAGER_CPP,
     THREAD_MANAGER_H,
+    THREAD_SPECIFIC_HANDLERS,
 };
 typedef struct{
   int type;
@@ -72,7 +73,8 @@ class CodeGen : public Visitor {
     fstream outfile_thread_init;
     fstream outfile_thread_manager_cpp;
     fstream outfile_thread_manager_h;
-    fstream *outfile[15];
+    fstream outfile_thread_specific_handlers;
+    fstream *outfile[16];
     int curr;
     int curr_thread_file;
    public:
