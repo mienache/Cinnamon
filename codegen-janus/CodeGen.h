@@ -26,6 +26,8 @@ enum{
     ACT_C,
     AT_C,
     THREAD_INIT_C,
+    THREAD_MANAGER_CPP,
+    THREAD_MANAGER_H,
 };
 typedef struct{
   int type;
@@ -68,8 +70,11 @@ class CodeGen : public Visitor {
     fstream outfile_ac;
     fstream outfile_at;
     fstream outfile_thread_init;
-    fstream *outfile[13];
+    fstream outfile_thread_manager_cpp;
+    fstream outfile_thread_manager_h;
+    fstream *outfile[15];
     int curr;
+    int curr_thread_file;
    public:
         
     CodeGen(std::string filename);

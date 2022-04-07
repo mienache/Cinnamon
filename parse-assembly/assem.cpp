@@ -85,6 +85,15 @@ string get_app_function_name(const string func_name)
     return "";
 }
 
+bool instr_adds_app_code(string instr)
+{
+    const string pattern = "insert_function_call_as_application.*"; 
+    return regex_match(instr, regex(pattern));
+}
+
+void process_meta_instructions();
+void flush_instr_buffer();
+
 int main(int argc, char** argv){
     if(argc < 2){
         cout << "Expecting assembly filename as input" << endl;
@@ -106,44 +115,23 @@ int main(int argc, char** argv){
             if(regex_match(line, regex(".*ret.*"))){
                 in_function = false;
 
-                int i = 0;
-                for(string label : labels){
-                    outfile_c << "instr_t *" + label + " = INSTR_CREATE_label(drcontext);" << endl;
-                }
-                if(save_arith_flag)
-                    use_reg("DR_REG_RAX");
-                for(i = 0; i < used_reg.size(); i++){
-                    string reg = used_reg.at(i);
-                    if(reg == "DR_REG_RSP" || reg == "DR_REG_RAX"){
-                        outfile_c << "dr_save_reg(drcontext,bb,trigger," + reg + ",SPILL_SLOT_" + to_string(i+1) + ");" << endl;
-                        if(reg == "DR_REG_RAX")
-                            RAX_slot = i+1;
-                    } else{
-                        outfile_c << "if(inRegSet(bitmask," + to_string(regName[reg]) + ")) dr_save_reg(drcontext,bb,trigger," + reg + ",SPILL_SLOT_" + to_string(i+1) + ");" << endl;
+                bool has_app_code = false;
+                for (auto instr : instr_buffer) {
+                    if (instr_adds_app_code(instr)) {
+                        has_app_code = true;
                     }
                 }
-                if(save_arith_flag){
-                    save_arith_flags(i+1);
-                }
-                
-                for(string instr: instr_buffer){
-                    outfile_c << instr << endl;
-                }
-                instr_buffer.clear();
 
-                for(i = 0; i < used_reg.size(); i++){
-                    string reg = used_reg.at(i);
-                    if(reg == "DR_REG_RSP" || reg == "DR_REG_RAX")
-                        outfile_c << "dr_restore_reg(drcontext,bb,trigger," + reg + ",SPILL_SLOT_" + to_string(i+1) + ");" << endl;
-                    else
-                        outfile_c << "if(inRegSet(bitmask," + to_string(regName[reg]) + ")) dr_restore_reg(drcontext,bb,trigger," + reg + ",SPILL_SLOT_" + to_string(i+1) + ");" << endl;
+                if (has_app_code) {
+                    // The current function inserts application code, so saving registers with
+                    // `dr_save_reg` won't work (`dr_save_reg` only stores them until the first app instr is executed,
+                    // see DynamoRIO documentation for more details)
+                    flush_instr_buffer();
                 }
-                if(save_arith_flag){
-                    restore_arith_flags(i+1);
+                else {
+                    process_meta_instructions();
                 }
-                
-                save_arith_flag = false;
-                used_reg.clear();
+
             }
             if(regex_match(line, regex("#.*"))){
                 continue;
@@ -513,7 +501,7 @@ dr_restore_reg(drcontext,bb,trigger,DR_REG_RSP,SPILL_SLOT_17);)";
         if(op[0] == OP_FUNC){
             const string app_func_name = get_app_function_name(opnd1);
             if(app_func_name.size()) {
-                return "insert_function_call_as_application(janus_context, " + app_func_name + ")";
+                return "insert_function_call_as_application(janus_context, " + app_func_name + ");";
             }
             if(regex_match(opnd1, regex("[a-zA-Z_0-9]*create_checker_thread[a-zA-Z_0-9]*"))) {
                 // TODO: discuss with Tim the best way to implement clean calls
@@ -741,4 +729,51 @@ int get_opnd_size(string opcode){
     } else {
         return -1;
     }
+}
+
+void process_meta_instructions()
+{
+    int i = 0;
+    for(string label : labels){
+        outfile_c << "instr_t *" + label + " = INSTR_CREATE_label(drcontext);" << endl;
+    }
+    if(save_arith_flag)
+        use_reg("DR_REG_RAX");
+    for(i = 0; i < used_reg.size(); i++){
+        string reg = used_reg.at(i);
+        if(reg == "DR_REG_RSP" || reg == "DR_REG_RAX"){
+            outfile_c << "dr_save_reg(drcontext,bb,trigger," + reg + ",SPILL_SLOT_" + to_string(i+1) + ");" << endl;
+            if(reg == "DR_REG_RAX")
+                RAX_slot = i+1;
+        } else{
+            outfile_c << "if(inRegSet(bitmask," + to_string(regName[reg]) + ")) dr_save_reg(drcontext,bb,trigger," + reg + ",SPILL_SLOT_" + to_string(i+1) + ");" << endl;
+        }
+    }
+    if(save_arith_flag){
+        save_arith_flags(i+1);
+    }
+    
+    flush_instr_buffer();
+
+    for(i = 0; i < used_reg.size(); i++){
+        string reg = used_reg.at(i);
+        if(reg == "DR_REG_RSP" || reg == "DR_REG_RAX")
+            outfile_c << "dr_restore_reg(drcontext,bb,trigger," + reg + ",SPILL_SLOT_" + to_string(i+1) + ");" << endl;
+        else
+            outfile_c << "if(inRegSet(bitmask," + to_string(regName[reg]) + ")) dr_restore_reg(drcontext,bb,trigger," + reg + ",SPILL_SLOT_" + to_string(i+1) + ");" << endl;
+    }
+    if(save_arith_flag){
+        restore_arith_flags(i+1);
+    }
+    
+    save_arith_flag = false;
+    used_reg.clear();
+}
+
+void flush_instr_buffer()
+{
+    for(string instr: instr_buffer){
+        outfile_c << instr << endl;
+    }
+    instr_buffer.clear();
 }

@@ -118,8 +118,12 @@ int num_threads = 0; // Number of threads to be created in Janus
 
 // This keeps the order in which threads will be registered in Janus.
 // The order is given by the order in which `thread` variables are defined in the dsl file.
- vector <string> thread_registration_order;
- map <string, string> thread_name_to_role;
+vector <string> thread_registration_order;
+map <string, string> thread_name_to_role;
+
+std::set<std::string> janus_local_libraries; // Janus libraries to be included
+
+const int NO_FILE = -1;
 
 void process_register_thread_call(FunctionCall *fc);
 
@@ -158,7 +162,9 @@ CodeGen::CodeGen(std::string filename){
     outfile_dh.open(filename+".dynh", ios::out);        //Global Var Definitions for Dynamic Part
     outfile_ac.open(filename+".cpp", ios::out);         //Code to be compiled into assembly
     outfile_at.open(filename+".at", ios::out);         //Code to be compiled into assembly
-    outfile_thread_init.open(filename+".thread_init", ios::out);         //Code to be compiled into assembly
+    outfile_thread_init.open(filename+".thread_init", ios::out);  //Code for Janus thread initialisation
+    outfile_thread_manager_cpp.open(filename+".thread_manager_cpp", ios::out); //Code for the Janus thread manager cpp
+    outfile_thread_manager_h.open(filename+".thread_manager_h", ios::out); //Code for the Janus thread manager header
     global_file = filename+".globalh" ;         
     outfile[STAT] = &outfile_s;
     outfile[DYN] = &outfile_d;
@@ -173,7 +179,10 @@ CodeGen::CodeGen(std::string filename){
     outfile[ACT_C] = &outfile_ac;
     outfile[AT_C] = &outfile_at;
     outfile[THREAD_INIT_C] = &outfile_thread_init;
+    outfile[THREAD_MANAGER_CPP] = &outfile_thread_manager_cpp;
+    outfile[THREAD_MANAGER_H] = &outfile_thread_manager_h;
     curr= STAT;
+    curr_thread_file = NO_FILE;
     get_func[STATIC]= get_static_func;                  //Utility functions for CFE attributes available in Static part
     get_func[DYNAMIC]= get_dyn_func;                    //Utility function for CFE attributes available in Dynamic part
 }
@@ -305,10 +314,16 @@ void CodeGen::visit(Identifier* id) {
    else{//access in static part
         std::cout << "NOT Within action " << std::endl;
       if(is_active_var(vid)){
+            if(curr_thread_file != NO_FILE) {
+                *(outfile[curr_thread_file])<<vid;
+            }
            *(outfile[curr])<<vid;
            if(is_global_var(vid)){
-              if(!exit_block && !init_block)
-                  global_uses[vid].first.ref = 1; //to be later used for adding to appropritate headers
+              if(!exit_block && !init_block) {
+                  // global_uses[vid].first.ref = 1; //to be later used for adding to appropritate headers
+                  // Commenting the above out as it doesn't seem to be correct. Why should the variables
+                  // used in actions be added to the StaticGenCode.cpp file in Janus?
+              }
            }
       }
        else{ 
@@ -988,10 +1003,15 @@ void CodeGen::visit(TypeDeclStmtList* tstmtlist) {
 }
 
 void CodeGen::visit(TypeDeclStmt* tstmt){
-    if(is_act)
-        *(outfile[curr]) << "extern ";
+    if(is_act && isInstanceOf<TypeDecl, ComplexTypeDecl>(tstmt->texpr)) {
+        // Must also write to thread manager header file
+        *(outfile[THREAD_MANAGER_H]) << "extern ";
+    }
+
+    *(outfile[curr]) << "extern ";
     tstmt->texpr->accept(*this);
     //*(outfile[curr])<<SEMICOLON;
+
 }
 
 void CodeGen::visit(VTypeList* vtypelst) {
@@ -1522,6 +1542,15 @@ void CodeGen::visit(ProgramBlock* prog) {
 
         *(outfile[curr])<< "// External functions" << endl;
         *(outfile[curr])<< thread_extern_func << endl;
+
+        janus_local_libraries.insert("dsl_thread_manager.h");
+    }
+
+    for(auto &header: janus_local_libraries) {
+        // Janus libraries must only be included in FUNC_H (.funch), as it will be copied 
+        // entirely to Janus, unlike ACT_C (.cpp) which is compiled to assembly and then parsed.
+
+        *(outfile[FUNC_H]) << "#include \"" << header << "\"" << endl;
     }
     
 
@@ -1569,10 +1598,7 @@ void CodeGen::visit(ProgramBlock* prog) {
     if (num_threads) {
         curr = INIT_C;
 
-        ++indentLevel[curr];
-        indent();
-        *(outfile[curr]) << "initThreads(" << num_threads << ");" << std::endl;
-        --indentLevel[curr];
+        *(outfile[curr]) << "init_num_threads(" << num_threads << ");" << std::endl;
     }
 
     //Step 5: All global declrations were combined in .globalh file. split them in .stath and .dynh file based on where they are accessed
@@ -1595,6 +1621,7 @@ void CodeGen::visit(ProgramBlock* prog) {
           outfile_gh.seekg(0);
           while(std::getline(outfile_gh, line)){
               if(lineNo == count){
+                  std::cout << "Adding line to STAT_H: " << line << endl;
                   *(outfile[STAT_H])<<line<<endl;
                   break;
               }
@@ -1613,7 +1640,12 @@ void CodeGen::visit(ProgramBlock* prog) {
                     line.erase(pos);
                     line+=";";
                   }
-                  *(outfile[FUNC_H])<< "extern " << line <<endl;
+                  if (line.find("extern") != 0) {
+                    *(outfile[FUNC_H]) << "extern " << line <<endl;
+                  }
+                  else {
+                    *(outfile[FUNC_H]) << line <<endl;
+                  }
                   break;
               }
               count++;
@@ -1881,17 +1913,28 @@ void CodeGen::visit(ComplexTypeDecl* complexTypeDecl) {
         std::cout << "NOT Adding identifier to global decls" << std::endl;
     }
 
+    if (global && isInstanceOf<ComplexType, ThreadType>(complexTypeDecl->type)) {
+        thread_registration_order.emplace_back(complexTypeDecl->ident->name);
+    }
+
+    if (isInstanceOf<ComplexType, ThreadType>(complexTypeDecl->type)) {
+        curr_thread_file = global ? THREAD_MANAGER_CPP : THREAD_MANAGER_H;
+    }
+
     complexTypeDecl->type->accept(*this);
     complexTypeDecl->ident->accept(*this);
     (*outfile[curr]) << ";" << endl;
 
-    if (global && isInstanceOf<ComplexType, ThreadType>(complexTypeDecl->type)) {
-        thread_registration_order.emplace_back(complexTypeDecl->ident->name);
+    if (isInstanceOf<ComplexType, ThreadType>(complexTypeDecl->type)) {
+        (*outfile[curr_thread_file]) << ";" << endl;
     }
+
+    curr_thread_file = NO_FILE;
 }
 
 void CodeGen::visit(ThreadType* threadType) {
     (*outfile[curr]) << "AppThread *";
+    (*outfile[curr_thread_file]) << "AppThread *";
     if (global) {
         // Currently support only global thread objects
         ++num_threads;
