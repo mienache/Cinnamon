@@ -27,6 +27,7 @@ class PrimtiveTypeDecl;
 class ComplexType;
 class ComplexTypeDecl;
 class ThreadType;
+class CometQueueType;
 
 typedef std::vector<Statement*>         stmtList;
 typedef std::vector<SelectionStmt*> selectStmtList;
@@ -422,6 +423,10 @@ class ComplexType: public VType{
         void accept(Visitor& v);
 };
 class ThreadType: public ComplexType {
+        public:
+        void accept(Visitor& v);
+};
+class CometQueueType: public ComplexType {
         public:
         void accept(Visitor& v);
 };

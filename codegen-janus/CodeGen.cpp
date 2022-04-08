@@ -113,8 +113,14 @@ extern void run_thread(AppThread *t);
 extern void register_thread(AppThread *t, char *thread_role);
 )";
 
+string ipc_extern_func=
+R"(
+extern BasicQueue* create_shared_memory_area();
+)";
+
 
 int num_threads = 0; // Number of threads to be created in Janus
+bool use_comet_queue = 0;
 
 // This keeps the order in which threads will be registered in Janus.
 // The order is given by the order in which `thread` variables are defined in the dsl file.
@@ -170,6 +176,8 @@ CodeGen::CodeGen(std::string filename){
     outfile_thread_manager_cpp.open(filename+".thread_manager_cpp", ios::out); // Code for the Janus thread manager cpp
     outfile_thread_manager_h.open(filename+".thread_manager_h", ios::out); // Code for the Janus thread manager header
     outfile_thread_specific_handlers.open(filename+".thread_specific_handlers", ios::out); // Store which handlers should be thread specific
+    outfile_ipc_cpp.open(filename+".ipc_cpp", ios::out); // Code for the Janus ipc cpp
+    outfile_ipc_h.open(filename+".ipc_h", ios::out); // Code for the Janus ipc header
     global_file = filename+".globalh" ;         
     outfile[STAT] = &outfile_s;
     outfile[DYN] = &outfile_d;
@@ -187,8 +195,11 @@ CodeGen::CodeGen(std::string filename){
     outfile[THREAD_MANAGER_CPP] = &outfile_thread_manager_cpp;
     outfile[THREAD_MANAGER_H] = &outfile_thread_manager_h;
     outfile[THREAD_SPECIFIC_HANDLERS] = &outfile_thread_specific_handlers;
+    outfile[IPC_CPP] = &outfile_ipc_cpp;
+    outfile[IPC_H] = &outfile_ipc_h;
     curr= STAT;
     curr_thread_file = NO_FILE;
+    curr_ipc_file = NO_FILE;
     get_func[STATIC]= get_static_func;                  //Utility functions for CFE attributes available in Static part
     get_func[DYNAMIC]= get_dyn_func;                    //Utility function for CFE attributes available in Dynamic part
 }
@@ -203,6 +214,9 @@ CodeGen::~CodeGen(){
 }
 
 void CodeGen::indent(){
+    if (curr == INIT_C) {
+        std::cout << "Indenting INIT_C where level = " << indentLevel[curr] << std::endl;
+    }
     for(int i=0; i<indentLevel[curr]; i++)
         *(outfile[curr])<<"    ";
 }
@@ -255,6 +269,9 @@ void CodeGen::visit(StatementList* stmtlst){
     std::cout << "Visiting StatementList" << std::endl;
     if(stmtlst->statements.size() != 0)
     {
+        std::cout << "init_block = " << init_block << std::endl;
+        std::cout << "Num statements: " << stmtlst->statements.size() << std::endl;
+
         for(auto stmt: stmtlst->statements){
             stmt->accept(*this);
         }
@@ -288,8 +305,8 @@ void CodeGen::visit(ExpressionList* el) {
     }        
 }
 void CodeGen::visit(Identifier* id) {
-    std::cout << "Visit Identifier " << std::endl;
    string vid = id->name;
+    std::cout << "Visit Identifier " << vid << std::endl;
    if(within_action){//access in dynamic part
         std::cout << "Within action " << std::endl;
        if(is_action_var(vid) || is_global_var(vid)){
@@ -322,6 +339,9 @@ void CodeGen::visit(Identifier* id) {
       if(is_active_var(vid)){
             if(curr_thread_file != NO_FILE) {
                 *(outfile[curr_thread_file])<<vid;
+            }
+            if(curr_ipc_file != NO_FILE) {
+                *(outfile[curr_ipc_file])<<vid;
             }
            *(outfile[curr])<<vid;
            if(is_global_var(vid)){
@@ -420,8 +440,8 @@ void CodeGen::visit(RegValExpr* regvalexpr){
         //TODO
 }
 void CodeGen::visit(IdentLHS* ilhs) {
-    std::cout << "Visiting IdentLHS" << std::endl;
-   string ident = ilhs->name->name;
+    string ident = ilhs->name->name;
+    std::cout << "Visiting IdentLHS " << ident << std::endl;
    if(fcall){                   //NB:A hack to avoid warnings or errors that function name not found as Cinnamon does not support function definitions a.t.m.
        *(outfile[curr])<<ident;
    }
@@ -913,12 +933,28 @@ void CodeGen::visit(TypePredExpr* typeexpr) {
 
 void CodeGen::visit(ExprStatement* estmt) {
     std::cout << "Visiting ExprStatement" << std::endl;
-    indent(); estmt->expr->accept(*this);
+
+    // TODO: extract the logic for should_indent and print_semicolon into a utility function.
+    bool should_indent = 1;
+    if (isInstanceOf<Expression, FunctionCall>(estmt->expr)) {
+        FunctionCall *fc = (FunctionCall*) estmt->expr;
+        const string func_name = ((IdentLHS*) fc->name)->name->name;
+        if (func_name == "register_thread" || func_name == "enable_thread_specific") {
+            should_indent = 0;
+        }
+    }
+
+    if (should_indent) {
+        indent();
+    }
+    
+    estmt->expr->accept(*this);
 
     bool print_semicolon = 1;
     if (isInstanceOf<Expression, FunctionCall>(estmt->expr)) {
         FunctionCall *fc = (FunctionCall*) estmt->expr;
-        if (((IdentLHS*) fc->name)->name->name == "register_thread") {
+        const string func_name = ((IdentLHS*) fc->name)->name->name;
+        if (func_name == "register_thread" || func_name == "enable_thread_specific") {
             print_semicolon = 0;
         }
     }
@@ -1014,8 +1050,17 @@ void CodeGen::visit(TypeDeclStmtList* tstmtlist) {
 
 void CodeGen::visit(TypeDeclStmt* tstmt){
     if(is_act && isInstanceOf<TypeDecl, ComplexTypeDecl>(tstmt->texpr)) {
-        // Must also write to thread manager header file
-        *(outfile[THREAD_MANAGER_H]) << "extern ";
+        ComplexTypeDecl *complexTypeDecl = (ComplexTypeDecl*) tstmt->texpr;
+        int tmp_file = NO_FILE;
+        if (isInstanceOf<ComplexType, ThreadType>(complexTypeDecl->type)) {
+            // Must also write to thread manager header file
+            tmp_file = THREAD_MANAGER_H;
+        }
+        if (isInstanceOf<ComplexType, CometQueueType>(complexTypeDecl->type)) {
+            tmp_file = IPC_H;
+        }
+        
+        *(outfile[tmp_file]) << "extern ";
     }
 
     *(outfile[curr]) << "extern ";
@@ -1402,7 +1447,7 @@ void CodeGen::visit(Action* action) {
     string buffer = "";
 
     if(action->trigger != T_AT && action->trigger != T_WITH){
-        indent();*(outfile[curr])<<func_sign<<"{"<<endl; buffer += func_sign + "    {\n";
+        indent();*(outfile[curr])<<func_sign<<"{"<<endl; buffer += func_sign + " {\n";
         indentLevel[curr]++;
         
         //Copy contents from temp to func.c file
@@ -1414,7 +1459,7 @@ void CodeGen::visit(Action* action) {
         }
         outfile_t.close();
         indentLevel[curr]--; indentLevel[ACT_C]--;
-        indent(); *(outfile[curr])<<"}"<<endl; buffer += "  }\n";
+        indent(); *(outfile[curr])<<"}"<<endl; buffer += "}\n\n";
     } else {
         buffer += func_sign + "    {\n";
         outfile_t.open("temp.cpp", ios::in);
@@ -1423,7 +1468,7 @@ void CodeGen::visit(Action* action) {
             buffer += line + "\n";
         }
         outfile_t.close();
-        buffer += "  }\n";
+        buffer += "}\n\n";
     }
 
     for(string varname:dummy_var){
@@ -1552,10 +1597,20 @@ void CodeGen::visit(ProgramBlock* prog) {
         *(outfile[curr])<< endl << "// Thread type declaration" << endl;
         *(outfile[curr])<< "extern struct AppThread;" << endl << endl;
 
-        *(outfile[curr])<< "// External functions" << endl;
+        *(outfile[curr])<< "// Thread external functions" << endl;
         *(outfile[curr])<< thread_extern_func << endl;
 
         janus_local_libraries.insert("dsl_thread_manager.h");
+    }
+
+    if (use_comet_queue) {
+        *(outfile[curr])<< endl << "// BasicQueue type declaration" << endl;
+        *(outfile[curr])<< "extern struct BasicQueue;" << endl << endl;
+
+        *(outfile[curr])<< "// IPC external functions" << endl;
+        *(outfile[curr])<< ipc_extern_func << endl;
+
+        janus_local_libraries.insert("dsl_ipc.h");
     }
 
     for(auto &header: janus_local_libraries) {
@@ -1569,6 +1624,7 @@ void CodeGen::visit(ProgramBlock* prog) {
     global= false;
     is_act = true;
     prog->globaldeclarations->accept(*this); 
+    *(outfile[curr]) << endl;
     is_act = false;
     curr = GLOBAL_H;
     // }
@@ -1602,7 +1658,9 @@ void CodeGen::visit(ProgramBlock* prog) {
         curr= INIT_C;
         indentLevel[curr]++;
         init_block = true;
+        std::cout << "Visiting init_stmts" << std::endl;
         prog->init_stmts->accept(*this);
+        std::cout << "Done visiting init_stmts" << std::endl;
         init_block = false;
         indentLevel[curr]--;
     }
@@ -1610,7 +1668,10 @@ void CodeGen::visit(ProgramBlock* prog) {
     if (num_threads) {
         curr = INIT_C;
 
+        indentLevel[curr]++;
+        indent();
         *(outfile[curr]) << "init_num_threads(" << num_threads << ");" << std::endl;
+        indentLevel[curr]--;
     }
 
     //Step 5: All global declrations were combined in .globalh file. split them in .stath and .dynh file based on where they are accessed
@@ -1932,6 +1993,9 @@ void CodeGen::visit(ComplexTypeDecl* complexTypeDecl) {
     if (isInstanceOf<ComplexType, ThreadType>(complexTypeDecl->type)) {
         curr_thread_file = global ? THREAD_MANAGER_CPP : THREAD_MANAGER_H;
     }
+    else if (isInstanceOf<ComplexType, CometQueueType>(complexTypeDecl->type)) {
+        curr_ipc_file = global ? IPC_CPP : IPC_H;
+    }
 
     complexTypeDecl->type->accept(*this);
     complexTypeDecl->ident->accept(*this);
@@ -1940,8 +2004,12 @@ void CodeGen::visit(ComplexTypeDecl* complexTypeDecl) {
     if (isInstanceOf<ComplexType, ThreadType>(complexTypeDecl->type)) {
         (*outfile[curr_thread_file]) << ";" << endl;
     }
+    else if (isInstanceOf<ComplexType, CometQueueType>(complexTypeDecl->type)) {
+        (*outfile[curr_ipc_file]) << ";" << endl;
+    }
 
     curr_thread_file = NO_FILE;
+    curr_ipc_file = NO_FILE;
 }
 
 void CodeGen::visit(ThreadType* threadType) {
@@ -1950,6 +2018,15 @@ void CodeGen::visit(ThreadType* threadType) {
     if (global) {
         // Currently support only global thread objects
         ++num_threads;
+    }
+}
+
+void CodeGen::visit(CometQueueType *cometQueueType) {
+    (*outfile[curr]) << "BasicQueue *";
+    (*outfile[curr_ipc_file]) << "BasicQueue *";
+    if (global) {
+        // Currently support only global queue objects
+        use_comet_queue = 1;
     }
 }
 

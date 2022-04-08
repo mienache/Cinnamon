@@ -60,6 +60,7 @@ public:
         virtual void visit(ComplexType* ctype) =0;
         virtual void visit(ComplexTypeDecl* ctypedecl) =0;
         virtual void visit(ThreadType* thread) =0;
+        virtual void visit(CometQueueType* cometQueueType) =0;
 
 };
 #endif

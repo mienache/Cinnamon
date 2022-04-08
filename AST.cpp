@@ -177,4 +177,8 @@ void ThreadType::accept(Visitor& v) {
     v.visit(this);
 }
 
+void CometQueueType::accept(Visitor& v) {
+    v.visit(this);
+}
+
 

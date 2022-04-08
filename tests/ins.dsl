@@ -1,16 +1,15 @@
 thread main_thread;
 thread checker_thread;
 uint64 inst_count = 0;
+comet_queue queue;
 
 init {
    register_thread(main_thread, "main");
+   queue = initialise_comet_queue();
 }
 
 select inst I where ((I.opcode) == Load) {
    before I {
-       inst_count = inst_count + 1;
-   }
-   after I {
       inst_count = inst_count + 1;
    }
 }

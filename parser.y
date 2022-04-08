@@ -54,7 +54,7 @@ void yyerror(ProgramBlock*& program, const char *s) {printf("ERROR: %s\n", s);}
 %token <token> TUPLE DICT VECT SET PAIR INT VAR CHAR DOUBLE BOOL UINT32 UINT64 ADDR_INT FILE_IO FILE_LINE INSTR
 %token <token> FUNC INST LOOP BASICBLOCK SSANODE MODULE
 %token <token> OP_CALL OP_MOV OP_ADD OP_SUB OP_MUL OP_DIV OP_NOP OP_RETURN OP_BRANCH OP_CMP OP_LOAD OP_STORE OP_GETPTR OP_INC OP_LABEL OP_JNL OP_JL
-%token <token> THREAD
+%token <token> THREAD COMET_QUEUE
 %left PLUS MINUS
 %left MULT DIV
 
@@ -90,7 +90,7 @@ void yyerror(ProgramBlock*& program, const char *s) {printf("ERROR: %s\n", s);}
 %type <typespec> v_type
 %type <primtype> primitive_type
 %type <comptype> composite_type tuple array dict pair set vect
-%type <complextype> complex_type thread
+%type <complextype> complex_type thread comet_queue
 %type <exprlist> composite_init
 %type <typespeclist> type_list
 %start prog
@@ -152,10 +152,13 @@ complex_type_decl:
         complex_type ident {$$ = new ComplexTypeDecl($1, $2); }
 ;
 complex_type:
-        thread {$$=$1;}
+        thread {$$=$1;} | comet_queue {$$=$1;}
 ;
 thread:
         THREAD {$$ = new ThreadType();}
+;
+comet_queue:
+        COMET_QUEUE {$$ = new CometQueueType();}
 ;
 tuple:
         TUPLE LT type_list GT {$$= new TupleType($3);}

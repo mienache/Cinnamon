@@ -29,6 +29,8 @@ enum{
     THREAD_MANAGER_CPP,
     THREAD_MANAGER_H,
     THREAD_SPECIFIC_HANDLERS,
+    IPC_CPP,
+    IPC_H,
 };
 typedef struct{
   int type;
@@ -74,9 +76,12 @@ class CodeGen : public Visitor {
     fstream outfile_thread_manager_cpp;
     fstream outfile_thread_manager_h;
     fstream outfile_thread_specific_handlers;
-    fstream *outfile[16];
+    fstream outfile_ipc_cpp;
+    fstream outfile_ipc_h;
+    fstream *outfile[18];
     int curr;
     int curr_thread_file;
+    int curr_ipc_file;
    public:
         
     CodeGen(std::string filename);
@@ -164,7 +169,9 @@ class CodeGen : public Visitor {
 
     void visit(SetType* set_);
     
-    void visit(ThreadType* thread);
+    void visit(ThreadType* threadType);
+
+    void visit(CometQueueType *cometQueueType);
 
     void visit(PrimitiveTypeDecl* ptypedecl);
     

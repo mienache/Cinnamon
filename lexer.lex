@@ -76,6 +76,7 @@ comment     "//".*"\n"
 "vector"                {return VECT;}
 "set"                   {return SET;}
 "thread"                {return THREAD;}
+"comet_queue"           {return COMET_QUEUE;}
 "inst"                  {return INST;}
 "instr"                 {return INSTR;}
 "ssanode"               {return SSANODE;}
