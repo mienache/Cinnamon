@@ -5,7 +5,7 @@ comet_queue queue;
 
 init {
    register_thread(main_thread, "main");
-   queue = initialise_comet_queue();
+   queue = initialise_queue();
 }
 
 select inst I where ((I.opcode) == Load) {
@@ -20,6 +20,26 @@ select func F where (F.isMain) {
 
       register_thread(checker_thread, "worker");
       run_thread(checker_thread);
+   }
+}
+
+select inst I where ((I.opcode) == Load) {
+   at I {
+      enable_thread_specific(main_thread);
+
+      if(I.num_dst_opnds) {
+         queue.enqueue(I.dst);
+      }
+   }
+}
+
+select inst I where ((I.opcode) == Load) {
+   at I {
+      enable_thread_specific(checker_thread);
+
+      if(I.num_dst_opnds) {
+         queue.dequeue_expect(I.dst);
+      }
    }
 }
 

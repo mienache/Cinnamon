@@ -142,7 +142,10 @@ map<string, string> get_dyn_func = {
         {"append", "bb_append(drcontext, bb, "},
         {"prepend", "bb_prepend(drcontext, bb, "},
         {"replace_bb", "replace_bb(drcontext, bb, "},
-        {"replace_bb_but_last", "replace_bb_but_last(drcontext, bb, "}
+        {"replace_bb_but_last", "replace_bb_but_last(drcontext, bb, "},
+        {"num_dst_opnds", "instr_num_dsts("},
+        {"enqueue", "add_instrumentation_code_for_queue_communication(janus_context, enqueue, "},
+        {"dequeue_expect", "add_instrumentation_code_for_queue_communication(janus_context, dequeue, "},
 };
 map<string, int> acc_func_dyn_cat = {
         {"val",1},

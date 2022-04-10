@@ -27,6 +27,7 @@ std::map<string, std::pair<struct var_use, struct var_use>> global_uses; //keeps
 
 typedef std::set<std::string> VarDefs;
 VarDefs activeCompVars;                         //active CFE elements
+VarDefs activeSpecialVars;                       //active special variables such as complex types (Comet, Thread)
 std::set<std::string> globalVars;               //set of global Vars 
 std::set<std::string> actionVars;               //set of variables defined within actions
 std::deque<std::string> activeVars;             //overall set of active variables (includes global and currently active)
@@ -576,22 +577,33 @@ void CodeGen::visit(DerefLHS* dlhs) {
     if( isInstanceOf<LHS, IdentLHS>(dlhs->base)){ //if we have I.trgaddr or x.y
         std::string base_name= ((IdentLHS*)dlhs->base)->name->name;
         std::string field_name = dlhs->field->name;
-        if(activeCompVars.count(base_name) > 0){ //This is a component type so call functions based on field 
+        std::cout << "base_name = " << base_name << std::endl;
+        std::cout << "field_name = " << field_name << std::endl;
+        std::cout << "mode = " << mode << std::endl;
+        if(activeCompVars.count(base_name) || activeSpecialVars.count(base_name)) {
+             // This is a component type (or complex type) so call functions based on field
+            std::cout << "in activeCompVars / activeSpecialVars" << std::endl;
             if(lhs_assn){
                cerr<<"ERROR: Cannot allow direct modification to internal data of component "<<base_name<<endl;
                error_count++;
             }
             else{
                 if(get_func[mode].count(field_name) > 0){
+                    std::cout << "found field_name " << field_name << std::endl;
                     curr_key += get_func[mode][field_name] + base_name + CLOSEPARAN; //need to check if static or dyn
                     while(deref_level>0){
                       curr_key += CLOSEPARAN;
                       deref_level--;
                     }
                     if(within_action){
+                        std::cout << "within action " << std::endl;
                         if(!type_expr){
+                            std::cout << "not type_expr" << std::endl;
                             if(get_dyn_func.find(field_name) != get_dyn_func.end()){
                                 if(!within_at){
+                                    // TODO: discuss with Tim what's the difference between "at" and "before" and why they are
+                                    // implemented differently.
+                                    std::cout << "not within_at" << std::endl;
                                     *(outfile[curr])<< base_name + "_" + field_name;
                                     string varname = base_name + "_" + field_name;
                                     if(find(glbl_dummy_var.begin(), glbl_dummy_var.end(), varname) == glbl_dummy_var.end()){
@@ -599,7 +611,13 @@ void CodeGen::visit(DerefLHS* dlhs) {
                                         glbl_dummy_var.insert(varname);
                                     }
                                 } else {
-                                    if (field_name == "print") {
+                                    std::cout << "in within_at" << std::endl;
+                                    if (activeSpecialVars.count(base_name)) {
+                                        string func_name = get_dyn_func[field_name];
+                                        *(outfile[curr])<< func_name + base_name + ", ";
+                                        in_function++;
+                                    }
+                                    else if (field_name == "print") {
                                         if(curr_ctype == INST)
                                             field_name = "print_inst";
                                         if(curr_ctype == BASICBLOCK)
@@ -1994,6 +2012,7 @@ void CodeGen::visit(ComplexTypeDecl* complexTypeDecl) {
         curr_thread_file = global ? THREAD_MANAGER_CPP : THREAD_MANAGER_H;
     }
     else if (isInstanceOf<ComplexType, CometQueueType>(complexTypeDecl->type)) {
+        activeSpecialVars.insert(identifier);
         curr_ipc_file = global ? IPC_CPP : IPC_H;
     }
 

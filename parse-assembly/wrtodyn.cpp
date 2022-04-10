@@ -85,15 +85,25 @@ int main(int argc, char** argv){
             outfile_dyn << "    " << line << endl;
         }
     }
+
+    if(num_rule > 0){
+        outfile_dyn << "}" << endl;
+    }
+
     while(getline(infile_at, line)){
         if(line != ""){
             if(regex_match(line, regex(".*func_[0-9]*.*"))){
-                if(num_rule > 0){
-                    outfile_dyn << "}" << endl;
-                }
                 num_rule++;
                 num_at_rule++;
                 outfile_dyn << "void handler_" + to_string(num_rule) + "(JANUS_CONTEXT){" << endl;
+
+                // Adding any thread constraints for the handler
+                const string thread_constraints = num_rule_to_thread_constraints[num_rule];
+                if (thread_constraints.size()) {
+                    outfile_dyn << "    " + thread_constraints << endl;
+
+                }
+
                 outfile_dyn << "    instr_t * trigger = get_trigger_instruction(bb,rule);" << endl;
                 outfile_dyn<<  "    dr_ctext = drcontext;"<<endl; 
                 outfile_dyn << "    uint64_t bitmask = rule->reg1;" << endl;
@@ -103,6 +113,8 @@ int main(int argc, char** argv){
             outfile_dyn << line << endl;
         }
     }
+
+    std::cout << "num_at_rule = " << num_at_rule << endl;
     if(num_rule > 0 && num_at_rule == 0)
         outfile_dyn << "}" << endl;
 
