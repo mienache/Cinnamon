@@ -762,7 +762,8 @@ void CodeGen::visit(DerefLHS* dlhs) {
 
 void handle_thread_specific_function_call(FunctionCall *fc);
 void CodeGen::visit(FunctionCall* fc) {
-    std::cout << "Visit FunctionCall" << std::endl;
+    const string func_name = (((IdentLHS*) fc->name)->name->name);
+    std::cout << "Visiting FunctionCall with func_name = " << func_name << std::endl;
 
     if (((IdentLHS*) fc->name)->name->name == "register_thread") {
         process_register_thread_call(fc);
@@ -773,17 +774,27 @@ void CodeGen::visit(FunctionCall* fc) {
         return;
     }
 
-    fcall = true;
-    fc->name->accept(*this);
+    bool only_janus_args = 0;
+    if (get_func[DYNAMIC].find(func_name) != get_func[DYNAMIC].end()) {
+        const string actual_func_call = get_func[DYNAMIC][func_name];
+        *(outfile[curr]) << actual_func_call;
+
+        only_janus_args = func_has_var(actual_func_call);
+    }
+    else {
+        fcall = true;
+        fc->name->accept(*this);
+    }
+
     fcall = false;
-    if(!no_var_func)
+    if(!no_var_func && !only_janus_args)
         *(outfile[curr])<<OPENPARAN;               
     fc->arguments->accept(*this);
     if(in_function > 0){
         *(outfile[curr])<<CLOSEPARAN;
         in_function--;
     }
-    if(!no_var_func)
+    if(!no_var_func || only_janus_args)
         *(outfile[curr])<<CLOSEPARAN;
     else
         no_var_func = false;

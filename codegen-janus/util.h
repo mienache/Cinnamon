@@ -144,8 +144,8 @@ map<string, string> get_dyn_func = {
         {"replace_bb", "replace_bb(drcontext, bb, "},
         {"replace_bb_but_last", "replace_bb_but_last(drcontext, bb, "},
         {"num_dst_opnds", "instr_num_dsts("},
-        {"enqueue", "add_instrumentation_code_for_queue_communication(janus_context, enqueue, "},
-        {"dequeue_expect", "add_instrumentation_code_for_queue_communication(janus_context, dequeue, "},
+        {"enqueue", "add_instrumentation_for_comet_enqueue(janus_context, "},
+        {"dequeue_expect", "add_instrumentation_for_comet_dequeue(janus_context, "},
 };
 map<string, int> acc_func_dyn_cat = {
         {"val",1},
@@ -195,6 +195,22 @@ map<string,string> get_bb_func={
         {"append", "bb_append(drcontext, bb, "},
         {"prepend", "bb_prepend(drcontext, bb, "},
 };
+
+// TODO: move this to a cpp file
+bool func_has_var(const string actual_func_call)
+{
+    std::cout << "Checking actual_func_call = " << actual_func_call << std::endl;
+    size_t len = actual_func_call.size() - 1;
+
+    while (len && actual_func_call[len] == ' ') {
+        --len;
+    }
+
+    assert(len);
+
+    return actual_func_call[len] == ',';
+}
+
 #endif
 
 

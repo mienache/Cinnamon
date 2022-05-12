@@ -1,11 +1,11 @@
 thread main_thread;
 thread checker_thread;
 uint64 inst_count = 0;
-comet_queue queue;
+comet_queue IPC_QUEUE_2;
 
 init {
    register_thread(main_thread, "main");
-   queue = initialise_queue();
+   IPC_QUEUE_2 = initialise_queue();
 }
 
 select inst I where ((I.opcode) == Load) {
@@ -27,9 +27,7 @@ select inst I where ((I.opcode) == Load) {
    at I {
       enable_thread_specific(main_thread);
 
-      if(I.num_dst_opnds) {
-         queue.enqueue(I.dst);
-      }
+      enqueue(IPC_QUEUE_2);
    }
 }
 
@@ -37,9 +35,7 @@ select inst I where ((I.opcode) == Load) {
    at I {
       enable_thread_specific(checker_thread);
 
-      if(I.num_dst_opnds) {
-         queue.dequeue_expect(I.dst);
-      }
+      dequeue_expect(IPC_QUEUE_2);
    }
 }
 
