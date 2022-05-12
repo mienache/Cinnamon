@@ -501,7 +501,7 @@ dr_restore_reg(drcontext,bb,trigger,DR_REG_RSP,SPILL_SLOT_17);)";
         if(op[0] == OP_FUNC){
             const string app_func_name = get_app_function_name(opnd1);
             if(app_func_name.size()) {
-                return "insert_function_call_as_application(janus_context, " + app_func_name + ");";
+                return "insert_function_call_as_application(janus_context, (void*) " + app_func_name + ");";
             }
             if(regex_match(opnd1, regex("[a-zA-Z_0-9]*create_checker_thread[a-zA-Z_0-9]*"))) {
                 // TODO: discuss with Tim the best way to implement clean calls
