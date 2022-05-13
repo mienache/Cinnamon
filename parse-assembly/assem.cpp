@@ -72,7 +72,11 @@ map<string, uint32_t> regName = {{"DR_REG_NULL", 0},
     {"DR_REG_R12W", 45},    {"DR_REG_R13W", 46},    {"DR_REG_R14W", 47},    {"DR_REG_R15W", 48},
 };
 
+// Functions that should be inserted as app functions in Janus
 vector<string> app_functions = {"run_thread"};
+
+// Functions that should be inserted as clean calls in Janus
+vector<string> clean_calls = {"wait_for_checker", "mark_checker_thread_finished"};
 
 string get_app_function_name(const string func_name)
 {
@@ -85,9 +89,26 @@ string get_app_function_name(const string func_name)
     return "";
 }
 
+string get_clean_call_function_name(const string func_name)
+{
+    for (auto clean_call: clean_calls) {
+        const string pattern = "[a-zA-Z_0-9]*" + clean_call + "[a-zA-Z_0-9]*";
+        if(regex_match(func_name, regex(pattern))) {
+            return clean_call;
+        }
+    }
+    return "";
+}
+
 bool instr_adds_app_code(string instr)
 {
     const string pattern = "insert_function_call_as_application.*"; 
+    return regex_match(instr, regex(pattern));
+}
+
+bool instr_is_clean_call(string instr)
+{
+    const string pattern = "dr_insert_clean_call.*";
     return regex_match(instr, regex(pattern));
 }
 
@@ -116,16 +137,21 @@ int main(int argc, char** argv){
                 in_function = false;
 
                 bool has_app_code = false;
+                bool is_clean_call;
                 for (auto instr : instr_buffer) {
                     if (instr_adds_app_code(instr)) {
                         has_app_code = true;
                     }
+                    if (instr_is_clean_call(instr)) {
+                        is_clean_call = true;
+                    }
                 }
 
-                if (has_app_code) {
+                if (has_app_code || is_clean_call) {
                     // The current function inserts application code, so saving registers with
                     // `dr_save_reg` won't work (`dr_save_reg` only stores them until the first app instr is executed,
                     // see DynamoRIO documentation for more details)
+                    // If the instruction is a clean call, no need to manually save the state
                     flush_instr_buffer();
                 }
                 else {
@@ -503,9 +529,10 @@ dr_restore_reg(drcontext,bb,trigger,DR_REG_RSP,SPILL_SLOT_17);)";
             if(app_func_name.size()) {
                 return "insert_function_call_as_application(janus_context, (void*) " + app_func_name + ");";
             }
-            if(regex_match(opnd1, regex("[a-zA-Z_0-9]*create_checker_thread[a-zA-Z_0-9]*"))) {
-                // TODO: discuss with Tim the best way to implement clean calls
-                return "dr_insert_clean_call(drcontext, bb, instrlist_first(bb), create_checker_thread, false, 0);";
+
+            const string clean_call_func_name = get_clean_call_function_name(opnd1);
+            if(clean_call_func_name.size()) {
+                return "dr_insert_clean_call(drcontext, bb, instrlist_first(bb), " + clean_call_func_name + ", false, 0);";
             }
             else {
                 output += "XINST_CREATE_call(drcontext, " + opnd1 + "));";

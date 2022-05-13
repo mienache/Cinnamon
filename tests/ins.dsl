@@ -23,6 +23,22 @@ select func F where (F.isMain) {
    }
 }
 
+select func F where (F.isMain) {
+   exit F {
+      enable_thread_specific(main_thread);
+
+      wait_for_checker_thread();
+   }
+}
+
+select func F where (F.isMain) {
+   exit F {
+      enable_thread_specific(checker_thread);
+
+      mark_checker_thread_finished();
+   }
+}
+
 select inst I where ((I.opcode) == Load) {
    at I {
       enable_thread_specific(main_thread);
@@ -36,6 +52,7 @@ select inst I where ((I.opcode) == Load) {
       enable_thread_specific(checker_thread);
 
       dequeue_expect(IPC_QUEUE_2);
+
    }
 }
 

@@ -112,6 +112,8 @@ string thread_extern_func =
 R"(
 extern void run_thread(AppThread *t);
 extern void register_thread(AppThread *t, char *thread_role);
+extern void wait_for_checker_thread();
+extern void mark_checker_thread_finished();
 )";
 
 string ipc_extern_func=
@@ -1635,6 +1637,7 @@ void CodeGen::visit(ProgramBlock* prog) {
     if (use_comet_queue) {
         *(outfile[curr])<< endl << "// BasicQueue type declaration" << endl;
         *(outfile[curr])<< "extern struct BasicQueue;" << endl << endl;
+        *(outfile[curr])<< "extern void foo(BasicQueue*);" << endl << endl;
 
         *(outfile[curr])<< "// IPC external functions" << endl;
         *(outfile[curr])<< ipc_extern_func << endl;
