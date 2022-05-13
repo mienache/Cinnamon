@@ -104,7 +104,8 @@ map<string, string> get_static_func = {
         {"src", "get_src2("},
         {"src2", "get_src3("},
         {"numLoops", "get_num_loops("},
-        {"isMain", "is_main_func(jc, "}
+        {"isMain", "is_main_func(jc, "},
+        {"needsCometInstrumentation", "instr_should_be_instrumented_for_comet("}
 };
 //TODO: make these specific to component type
 map<string, string> get_dyn_func = {

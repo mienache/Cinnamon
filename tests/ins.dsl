@@ -1,17 +1,10 @@
 thread main_thread;
 thread checker_thread;
-uint64 inst_count = 0;
-comet_queue IPC_QUEUE_2;
+comet_queue COMET_QUEUE;
 
 init {
    register_thread(main_thread, "main");
-   IPC_QUEUE_2 = initialise_queue();
-}
-
-select inst I where ((I.opcode) == Load) {
-   before I {
-      inst_count = inst_count + 1;
-   }
+   COMET_QUEUE = initialise_queue();
 }
 
 select func F where (F.isMain) {
@@ -39,23 +32,19 @@ select func F where (F.isMain) {
    }
 }
 
-select inst I where ((I.opcode) == Load) {
+select inst I where (I.needsCometInstrumentation) {
    at I {
       enable_thread_specific(main_thread);
 
-      enqueue(IPC_QUEUE_2);
+      enqueue(COMET_QUEUE);
    }
 }
 
-select inst I where ((I.opcode) == Load) {
+select inst I where (I.needsCometInstrumentation) {
    at I {
       enable_thread_specific(checker_thread);
 
-      dequeue_expect(IPC_QUEUE_2);
+      dequeue_expect(COMET_QUEUE);
 
    }
-}
-
-exit{
-   print_u64(inst_count);
 }

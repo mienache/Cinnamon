@@ -118,7 +118,7 @@ extern void mark_checker_thread_finished();
 
 string ipc_extern_func=
 R"(
-extern BasicQueue* create_shared_memory_area();
+extern CometQueue* create_shared_memory_area();
 )";
 
 
@@ -1635,9 +1635,9 @@ void CodeGen::visit(ProgramBlock* prog) {
     }
 
     if (use_comet_queue) {
-        *(outfile[curr])<< endl << "// BasicQueue type declaration" << endl;
-        *(outfile[curr])<< "extern struct BasicQueue;" << endl << endl;
-        *(outfile[curr])<< "extern void foo(BasicQueue*);" << endl << endl;
+        *(outfile[curr])<< endl << "// CometQueue type declaration" << endl;
+        *(outfile[curr])<< "extern struct CometQueue;" << endl << endl;
+        *(outfile[curr])<< "extern void foo(CometQueue*);" << endl << endl;
 
         *(outfile[curr])<< "// IPC external functions" << endl;
         *(outfile[curr])<< ipc_extern_func << endl;
@@ -2055,8 +2055,8 @@ void CodeGen::visit(ThreadType* threadType) {
 }
 
 void CodeGen::visit(CometQueueType *cometQueueType) {
-    (*outfile[curr]) << "BasicQueue *";
-    (*outfile[curr_ipc_file]) << "BasicQueue *";
+    (*outfile[curr]) << "CometQueue *";
+    (*outfile[curr_ipc_file]) << "CometQueue *";
     if (global) {
         // Currently support only global queue objects
         use_comet_queue = 1;
