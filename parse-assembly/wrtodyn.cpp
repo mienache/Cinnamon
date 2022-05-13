@@ -187,8 +187,8 @@ void compute_num_rule_to_thread_constraints(const string &filename)
         const string indent = "    ";
         const string thread_constraint = (
             "if (!(" + thread_name + " && dr_get_thread_id(drcontext) == " + thread_name + "->pid)) {\n" + 
-            indent + indent + "std::cout << \"Only " + thread_name + " should be instrumented through handler_" + to_string(num_rule) + ".\" << std::endl;\n" +
-            indent + indent + "std::cout << \"TID \" << dr_get_thread_id(drcontext) << \" will skipp instrumenting.\" << std::endl;\n" +
+            indent + indent + "// std::cout << \"Only " + thread_name + " should be instrumented through handler_" + to_string(num_rule) + ".\" << std::endl;\n" +
+            indent + indent + "// std::cout << \"TID \" << dr_get_thread_id(drcontext) << \" will skipp instrumenting.\" << std::endl;\n" +
             indent + indent + "return;\n" + 
             indent + "}"
         );
