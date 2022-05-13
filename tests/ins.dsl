@@ -4,7 +4,7 @@ comet_queue COMET_QUEUE;
 
 init {
    register_thread(main_thread, "main");
-   COMET_QUEUE = initialise_queue();
+   COMET_QUEUE = initialise_comet_queue();
 }
 
 select func F where (F.isMain) {

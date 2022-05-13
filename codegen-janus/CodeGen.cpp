@@ -1643,6 +1643,8 @@ void CodeGen::visit(ProgramBlock* prog) {
         *(outfile[curr])<< ipc_extern_func << endl;
 
         janus_local_libraries.insert("dsl_ipc.h");
+        stdLib.insert("algorithm");
+        stdLib.insert("vector");
     }
 
     for(auto &header: janus_local_libraries) {
