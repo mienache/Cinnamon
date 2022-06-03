@@ -1,0 +1,24 @@
+==== OPTION A: Using Docker containers
+
+0) Mount the `janus` and `cinnamon` paths on your local file system
+by updating the `run_container.sh` script (change the `/c/uni_work/...`
+to the path on your system).
+
+1) Start a Docker container;
+
+$ ./run_container.sh
+
+2) Compile for Janus:
+
+$ make TARGET=janus
+
+3) From inside the Docker container, run:
+
+$ ./compile_to_janus
+
+==== OPTION B: Without Docker containers
+
+A Docker container is not required, but you have to manually update
+the paths inside the `Scripts/compileToJanus.py` script. (both the `JanusPATH`
+and `parserPATH`) - see more details on the original GitHub page: 
+https://github.com/CompArchCam/Cinnamon/
