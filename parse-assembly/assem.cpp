@@ -532,7 +532,9 @@ dr_restore_reg(drcontext,bb,trigger,DR_REG_RSP,SPILL_SLOT_17);)";
 
             const string clean_call_func_name = get_clean_call_function_name(opnd1);
             if(clean_call_func_name.size()) {
-                return "dr_insert_clean_call(drcontext, bb, instrlist_first(bb), " + clean_call_func_name + ", false, 0);";
+                // NOTE: the line below must be changed from `instrlist_last` to `instrlist_first`
+                // depending on where the static rule is; COMET only needs `last`;
+                return "dr_insert_clean_call(drcontext, bb, instrlist_last(bb), " + clean_call_func_name + ", false, 0);";
             }
             else {
                 output += "XINST_CREATE_call(drcontext, " + opnd1 + "));";
